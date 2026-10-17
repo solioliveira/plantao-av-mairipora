@@ -8,6 +8,7 @@ import { TeamSchedule } from './components/TeamSchedule';
 import { OccurrenceLog } from './components/OccurrenceLog';
 import { ChecklistDrawer } from './components/ChecklistDrawer';
 import { ReportGenerator } from './components/ReportGenerator';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   Auditorium,
   AuditoriumTeam,
@@ -245,6 +246,9 @@ export default function App() {
           </span>
         </div>
       </footer>
+
+      {/* Floating Offline Notification when network is lost */}
+      <OfflineIndicator />
     </div>
   );
 }

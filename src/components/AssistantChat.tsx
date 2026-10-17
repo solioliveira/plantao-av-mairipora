@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   ArrowRight,
   Zap,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { ChatMessage, Auditorium } from '../types';
 
@@ -52,10 +54,96 @@ Selecione uma dúvida rápida abaixo ou descreva qualquer sintoma para diagnóst
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Speech-to-Text (Reconhecimento de Voz nativo do navegador)
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert(
+        'O reconhecimento de voz não é suportado pelo seu navegador atual.\n\nRecomendamos usar o Google Chrome, Microsoft Edge ou Safari para ditar por voz.'
+      );
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (e) {
+        // ignore
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+
+      const initialBaseText = input;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+
+        if (currentTranscript) {
+          const separator = initialBaseText.trim().length > 0 ? ' ' : '';
+          setInput(`${initialBaseText}${separator}${currentTranscript}`);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Falha ao iniciar SpeechRecognition:', err);
+      setIsListening(false);
+    }
   };
 
   useEffect(() => {
@@ -338,22 +426,72 @@ Lembre-se das regras fundamentais:
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Active Voice Dictation Banner */}
+      {isListening && (
+        <div className="px-4 py-2 bg-rose-950/80 border-t border-rose-500/40 text-xs text-rose-200 flex items-center justify-between animate-in fade-in slide-in-from-bottom-1">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+            <span>Ouvindo em português (pt-BR)... Fale o sintoma ou dúvida técnica.</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleListening}
+            className="text-[11px] underline font-semibold text-rose-300 hover:text-white"
+          >
+            Concluir / Parar
+          </button>
+        </div>
+      )}
+
       {/* Input Form */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (isListening) {
+            toggleListening();
+          }
           handleSendMessage();
         }}
         className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
       >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ex: Como proceder se o PC 1 travar na oração final? Ou relatar falha..."
-          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-          disabled={loading}
-        />
+        <div className="relative flex-1 flex items-center">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              isListening
+                ? 'Ouvindo sua voz... (transcrevendo automaticamente)'
+                : 'Ex: Como proceder se o PC 1 travar na oração final? Ou ditar pelo microfone...'
+            }
+            className={`w-full bg-slate-900 border rounded-xl pl-4 pr-11 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-colors ${
+              isListening
+                ? 'border-rose-500/80 ring-1 ring-rose-500/40 text-rose-100 placeholder-rose-300/60'
+                : 'border-slate-700 focus:border-emerald-500'
+            }`}
+            disabled={loading}
+          />
+
+          {/* Microphone button inside / at the end of input field */}
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={loading}
+            title={
+              isListening
+                ? 'Parar gravação de voz'
+                : 'Ditado por Voz (Falar em vez de digitar no celular ou tablet)'
+            }
+            className={`absolute right-1.5 p-2 rounded-lg transition-all flex items-center justify-center ${
+              isListening
+                ? 'bg-rose-600 text-white animate-pulse shadow-md ring-2 ring-rose-400'
+                : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800'
+            }`}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+        </div>
+
         <button
           type="submit"
           disabled={loading || !input.trim()}

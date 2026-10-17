@@ -14,6 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Auditorium } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   currentAuditorium: Auditorium;
@@ -78,6 +79,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               Auditório B
             </button>
           </div>
+
+          {/* PWA Install Button */}
+          <PWAInstallButton />
 
           {/* Equipment Status Pills */}
           <div className="hidden lg:flex items-center gap-2">

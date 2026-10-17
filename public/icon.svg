@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base with rounded squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#1e293b" stroke-width="8"/>
+
+  <!-- Subtle glow ring -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="url(#accent)" stroke-width="3" opacity="0.25"/>
+
+  <!-- Central Audio/Video Mixing Emblem -->
+  <g transform="translate(106, 116)">
+    <!-- Video Camera Symbol -->
+    <path d="M40 70 C40 53 53 40 70 40 L190 40 C207 40 220 53 220 70 L220 150 C220 167 207 180 190 180 L70 180 C53 180 40 167 40 150 Z" fill="#1e293b" stroke="#334155" stroke-width="6"/>
+    <path d="M220 85 L270 55 C278 50 288 56 288 65 L288 155 C288 164 278 170 270 165 L220 135 Z" fill="url(#glow)"/>
+    <circle cx="130" cy="110" r="34" fill="#0f172a" stroke="#10b981" stroke-width="8"/>
+    <circle cx="130" cy="110" r="14" fill="#38bdf8"/>
+
+    <!-- Sound Console Faders below -->
+    <!-- Fader Track 1 -->
+    <line x1="60" y1="210" x2="60" y2="280" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+    <rect x="46" y="235" width="28" height="14" rx="4" fill="#10b981"/>
+
+    <!-- Fader Track 2 -->
+    <line x1="120" y1="210" x2="120" y2="280" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+    <rect x="106" y="218" width="28" height="14" rx="4" fill="#38bdf8"/>
+
+    <!-- Fader Track 3 -->
+    <line x1="180" y1="210" x2="180" y2="280" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+    <rect x="166" y="246" width="28" height="14" rx="4" fill="#10b981"/>
+
+    <!-- Fader Track 4 (Master) -->
+    <line x1="240" y1="210" x2="240" y2="280" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+    <rect x="226" y="224" width="28" height="14" rx="4" fill="#f59e0b"/>
+  </g>
+
+  <!-- Mairipora A/V Monogram / Badge Text -->
+  <text x="256" y="445" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#94a3b8" text-anchor="middle" letter-spacing="4">MAIRIPORÃ A/V</text>
+</svg>
