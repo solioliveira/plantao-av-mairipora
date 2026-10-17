@@ -1,0 +1,6 @@
+{
+  "name": "Assistente de Plantão A/V - Salão de Assembleias de Mairiporã",
+  "description": "Assistente técnico de suporte em tempo real, troubleshooting operacional, escala de equipes e geração de relatórios oficiais para Áudio e Vídeo do Salão de Assembleias de Mairiporã.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
