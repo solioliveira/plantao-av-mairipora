@@ -10,8 +10,10 @@ import {
   RotateCcw,
   AlertTriangle,
   Download,
+  Send,
 } from 'lucide-react';
 import { AuditoriumTeam, Occurrence, ChecklistItem, Auditorium } from '../types';
+import { shareOrFallback, downloadTextFile } from '../utils/shareUtils';
 
 interface ReportGeneratorProps {
   currentAuditorium: Auditorium;
@@ -31,8 +33,14 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [customReportText, setCustomReportText] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ text: string; isSuccess: boolean } | null>(null);
 
-  // Generate standard structured report text
+  const showToast = (text: string, isSuccess: boolean) => {
+    setToastMessage({ text, isSuccess });
+    setTimeout(() => setToastMessage(null), 4500);
+  };
+
+  // Generate standard structured report text with simplified leadership roster
   const generateStandardText = () => {
     const activeTeam = currentAuditorium === 'A' ? teamA : teamB;
     const closingItems = checklist.filter((i) => i.phase === 'encerramento');
@@ -46,38 +54,21 @@ SALÃO DE ASSEMBLEIAS DE MAIRIPORÃ (CO-160-T / REV. 2026)
 1. DADOS GERAIS DO EVENTO
 ------------------------------------------------------------------------
 • Data do Plantão: ${activeTeam.date}
-• Evento / Assembleia: ${activeTeam.eventName}
-• Circuito: ${activeTeam.circuit}
-• Auditório em Operação Principal: Auditório ${currentAuditorium} (Salão de Mairiporã)
+• Auditório em Operação: Auditório ${currentAuditorium} (Salão de Mairiporã)
 • Plantonista Responsável: ${activeTeam.dutyTechnician}
+• Superintendente de Áudio e Vídeo: ${activeTeam.superintendentAV || activeTeam.superintendentAudio || 'Designado'}
 
-2. ESCALA DAS EQUIPES COMPLETAS
+2. ESCALA E SUPERVISÃO DE PLANTÃO
 ------------------------------------------------------------------------
 [ AUDITÓRIO A ]
-• Superintendente de Áudio e Vídeo: ${teamA.superintendentAV}
-• Diretor Técnico: ${teamA.technicalDirector}
-• Superintendente Assistente (Áudio): ${teamA.assistantAudio}
-• Superintendente Assistente (Vídeo): ${teamA.assistantVideo}
-• Superintendente Assistente (Palco): ${teamA.assistantStage}
-• Operador de Mesa de Som (Qu-16): ${teamA.soundOperator}
-• Assistente de Som (Decibelímetro): ${teamA.soundAssistant}
-• Operador da Mesa de Corte (Blackmagic): ${teamA.switchOperator}
-• Operador de Mídia (JW Library): ${teamA.mediaOperator}
-• Operadores de Câmera PTZ: ${teamA.cameraOperators}
-• Equipe de Palco & Maquiagem: ${teamA.stageMakeupTeam}
+• Data do Plantão: ${teamA.date}
+• Plantonista Responsável: ${teamA.dutyTechnician}
+• Superintendente de Áudio e Vídeo: ${teamA.superintendentAV || teamA.superintendentAudio || 'Designado'}
 
 [ AUDITÓRIO B ]
-• Superintendente de Áudio e Vídeo: ${teamB.superintendentAV}
-• Diretor Técnico: ${teamB.technicalDirector}
-• Superintendente Assistente (Áudio): ${teamB.assistantAudio}
-• Superintendente Assistente (Vídeo): ${teamB.assistantVideo}
-• Superintendente Assistente (Palco): ${teamB.assistantStage}
-• Operador de Mesa de Som (Qu-16): ${teamB.soundOperator}
-• Assistente de Som (Decibelímetro): ${teamB.soundAssistant}
-• Operador da Mesa de Corte (Blackmagic): ${teamB.switchOperator}
-• Operador de Mídia (JW Library): ${teamB.mediaOperator}
-• Operadores de Câmera PTZ: ${teamB.cameraOperators}
-• Equipe de Palco & Maquiagem: ${teamB.stageMakeupTeam}
+• Data do Plantão: ${teamB.date}
+• Plantonista Responsável: ${teamB.dutyTechnician}
+• Superintendente de Áudio e Vídeo: ${teamB.superintendentAV || teamB.superintendentAudio || 'Designado'}
 
 3. CONDIÇÕES INICIAIS DOS EQUIPAMENTOS
 ------------------------------------------------------------------------
@@ -123,6 +114,7 @@ Data: ${activeTeam.date}
   };
 
   const currentReport = customReportText || generateStandardText();
+  const activeTeam = currentAuditorium === 'A' ? teamA : teamB;
 
   // Gemini AI Polished Report Generator
   const handleGenerateAIReport = async () => {
@@ -152,10 +144,11 @@ Data: ${activeTeam.date}
       const data = await response.json();
       if (data.report) {
         setCustomReportText(data.report);
+        showToast('Relatório aprimorado com sucesso pela inteligência artificial!', true);
       }
     } catch (err) {
       console.error(err);
-      alert('Não foi possível conectar com o servidor para refinar o relatório com IA. Usando modelo padrão.');
+      showToast('Não foi possível conectar com a IA online. Usando modelo padrão.', false);
     } finally {
       setIsGeneratingAI(false);
     }
@@ -164,6 +157,7 @@ Data: ${activeTeam.date}
   const handleCopy = () => {
     navigator.clipboard.writeText(currentReport);
     setCopied(true);
+    showToast('Relatório completo copiado para a área de transferência!', true);
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -171,20 +165,57 @@ Data: ${activeTeam.date}
     window.print();
   };
 
-  const handleWhatsApp = () => {
-    const textEncoded = encodeURIComponent(
-      `*RELATÓRIO OFICIAL A/V - SALÃO DE MAIRIPORÃ*\n\n` +
-        `*Data:* ${teamA.date} | *Auditório:* ${currentAuditorium}\n` +
-        `*Evento:* ${teamA.eventName} (${teamA.circuit})\n` +
-        `*Plantonista:* ${teamA.dutyTechnician}\n` +
-        `*Ocorrências:* ${occurrences.length} registradas.\n\n` +
-        `_Acesse o relatório completo arquivado no posto operacional._`
+  const handleDownloadTxt = () => {
+    const filename = `relatorio-plantao-mairipora-${activeTeam.date}-aud-${currentAuditorium}.txt`;
+    downloadTextFile(filename, currentReport);
+    showToast(`Arquivo "${filename}" baixado com sucesso!`, true);
+  };
+
+  // Robust Share with WhatsApp + Clipboard fallback
+  const handleShare = async () => {
+    const title = `Relatório Oficial A/V - Salão de Mairiporã (${activeTeam.date})`;
+    const whatsappSummary = `*RELATÓRIO OFICIAL DO PLANTÃO A/V - SALÃO DE MAIRIPORÃ*\n\n` +
+      `📅 *Data do Plantão:* ${activeTeam.date} | *Auditório:* ${currentAuditorium}\n` +
+      `🔧 *Plantonista Responsável:* ${activeTeam.dutyTechnician}\n` +
+      `👤 *Superintendente de Áudio e Vídeo:* ${activeTeam.superintendentAV || activeTeam.superintendentAudio || 'Designado'}\n` +
+      `⚠️ *Ocorrências:* ${occurrences.length} registradas\n\n` +
+      `_O relatório completo e detalhado foi copiado para a área de transferência. Cole o texto completo aqui para envio oficial._`;
+
+    await shareOrFallback(
+      {
+        title,
+        text: currentReport,
+        whatsappSummary,
+        fileName: `relatorio-plantao-${activeTeam.date}.txt`,
+      },
+      (msg, isSuccess) => showToast(msg, isSuccess)
     );
-    window.open(`https://api.whatsapp.com/send?text=${textEncoded}`, '_blank');
   };
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div
+          className={`p-3.5 rounded-xl border flex items-center justify-between text-xs shadow-lg animate-in fade-in slide-in-from-top-2 ${
+            toastMessage.isSuccess
+              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+              : 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-medium">{toastMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-[11px] font-bold text-slate-400 hover:text-white px-2 py-0.5"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
       {/* Header & Actions Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -192,9 +223,14 @@ Data: ${activeTeam.date}
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-100 text-base">Relatório Oficial do Plantão</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-slate-100 text-base">Relatório Oficial do Plantão</h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                Auditório {currentAuditorium}
+              </span>
+            </div>
             <p className="text-xs text-slate-400">
-              Estruturado estritamente nos 5 tópicos oficiais exigidos pelo Salão de Mairiporã
+              Estrutura nos 5 tópicos oficiais com compartilhamento direto e cópia automática
             </p>
           </div>
         </div>
@@ -205,33 +241,46 @@ Data: ${activeTeam.date}
             onClick={handleGenerateAIReport}
             disabled={isGeneratingAI}
             className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all disabled:opacity-50"
+            title="Usa o modelo Gemini para formatar o relatório com redação técnica oficial"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            {isGeneratingAI ? 'Redigindo com IA...' : 'Aprimorar com IA (Gemini)'}
+            {isGeneratingAI ? 'Redigindo com IA...' : 'Aprimorar com IA'}
           </button>
 
           <button
             onClick={handleCopy}
             className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Copiar texto completo para a área de transferência"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copiado!' : 'Copiar'}
           </button>
 
           <button
+            onClick={handleDownloadTxt}
+            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Baixar arquivo de texto (.txt) no dispositivo"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-300" />
+            Baixar .txt
+          </button>
+
+          <button
             onClick={handlePrint}
             className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Imprimir ou salvar como PDF limpo"
           >
             <Printer className="w-3.5 h-3.5" />
             Imprimir / PDF
           </button>
 
           <button
-            onClick={handleWhatsApp}
-            className="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            onClick={handleShare}
+            className="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
+            title="Compartilhar via aplicativo móvel ou copiar e abrir WhatsApp"
           >
             <Share2 className="w-3.5 h-3.5" />
-            WhatsApp
+            Compartilhar / WhatsApp
           </button>
         </div>
       </div>
@@ -239,7 +288,7 @@ Data: ${activeTeam.date}
       {/* Editor & Preview Area */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
         <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
-          <span>Prévia do Documento Oficial (Editável)</span>
+          <span className="font-semibold text-slate-300">Prévia do Documento Oficial (Editável)</span>
           {customReportText && (
             <button
               onClick={() => setCustomReportText('')}

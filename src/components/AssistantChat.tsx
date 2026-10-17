@@ -21,6 +21,7 @@ import { ChatMessage, Auditorium } from '../types';
 interface AssistantChatProps {
   currentAuditorium: Auditorium;
   onOpenTroubleshooting?: (id: string) => void;
+  autoStartVoiceTrigger?: number;
 }
 
 const QUICK_PROMPTS = [
@@ -34,7 +35,11 @@ const QUICK_PROMPTS = [
   'Presets 1, 3 e 10 da controladora Panasonic AW-RP50',
 ];
 
-export const AssistantChat: React.FC<AssistantChatProps> = ({ currentAuditorium, onOpenTroubleshooting }) => {
+export const AssistantChat: React.FC<AssistantChatProps> = ({
+  currentAuditorium,
+  onOpenTroubleshooting,
+  autoStartVoiceTrigger,
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -149,6 +154,15 @@ Selecione uma dúvida rápida abaixo ou descreva qualquer sintoma para diagnóst
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (autoStartVoiceTrigger && autoStartVoiceTrigger > 0 && !isListening) {
+      const timer = setTimeout(() => {
+        toggleListening();
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [autoStartVoiceTrigger]);
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || input.trim();

@@ -23,13 +23,23 @@ import { Occurrence, Auditorium } from '../types';
 interface TroubleshootingGuideProps {
   currentAuditorium: Auditorium;
   onAddOccurrence: (occurrence: Omit<Occurrence, 'id' | 'timestamp'>) => void;
+  selectedGuideId?: string;
+  onSelectGuideId?: (id: string) => void;
 }
 
 export const TroubleshootingGuide: React.FC<TroubleshootingGuideProps> = ({
   currentAuditorium,
   onAddOccurrence,
+  selectedGuideId: controlledGuideId,
+  onSelectGuideId,
 }) => {
-  const [selectedGuideId, setSelectedGuideId] = useState<string>('no-sound-pc');
+  const [internalGuideId, setInternalGuideId] = useState<string>('no-sound-pc');
+  const selectedGuideId = controlledGuideId || internalGuideId;
+  const setSelectedGuideId = (id: string) => {
+    setInternalGuideId(id);
+    if (onSelectGuideId) onSelectGuideId(id);
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('Todos');
 

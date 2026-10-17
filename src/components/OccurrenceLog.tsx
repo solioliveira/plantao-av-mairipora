@@ -11,8 +11,13 @@ import {
   MapPin,
   ShieldAlert,
   ChevronDown,
+  Share2,
+  Download,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Occurrence, OccurrenceSeverity, OccurrenceCategory, OccurrenceStatus, Auditorium } from '../types';
+import { shareOrFallback, downloadTextFile } from '../utils/shareUtils';
 
 interface OccurrenceLogProps {
   currentAuditorium: Auditorium;
@@ -74,8 +79,87 @@ export const OccurrenceLog: React.FC<OccurrenceLogProps> = ({
     return matchesAudit && matchesStatus && matchesSearch;
   });
 
+  const [toastMessage, setToastMessage] = useState<{ text: string; isSuccess: boolean } | null>(null);
+
+  const showToast = (text: string, isSuccess: boolean) => {
+    setToastMessage({ text, isSuccess });
+    setTimeout(() => setToastMessage(null), 4500);
+  };
+
+  const formatOccurrencesText = () => {
+    const header = `========================================================================\n` +
+      `LIVRO DE OCORRÊNCIAS - ÁUDIO E VÍDEO\n` +
+      `SALÃO DE ASSEMBLEIAS DE MAIRIPORÃ (CO-160-T / REV. 2026)\n` +
+      `========================================================================\n` +
+      `Total de Ocorrências: ${occurrences.length}\n` +
+      `Auditório Filtrado: ${filterAuditorium}\n\n`;
+
+    const body = filteredOccurrences.length === 0
+      ? 'Nenhuma ocorrência registrada no momento.'
+      : filteredOccurrences
+          .map(
+            (occ, idx) =>
+              `[#${idx + 1}] - Horário: ${occ.timestamp} | Auditório ${occ.auditorium} | ${occ.category} (Gravidade: ${occ.severity})\n` +
+              `• Sintoma: ${occ.symptom}\n` +
+              `• Local Inspecionado: ${occ.locationChecked}\n` +
+              `• Ação Tomada: ${occ.actionTaken}\n` +
+              `• Status: ${occ.status}\n` +
+              `• Responsável: ${occ.operatorInCharge || 'Plantonista'}\n`
+          )
+          .join('\n------------------------------------------------------------------------\n');
+
+    return `${header}${body}\n========================================================================\n`;
+  };
+
+  const handleShareOccurrences = async () => {
+    const text = formatOccurrencesText();
+    const title = `Ocorrências A/V Mairiporã (${occurrences.length} registros)`;
+    const whatsappSummary = `*LIVRO DE OCORRÊNCIAS A/V - SALÃO DE MAIRIPORÃ*\n\n` +
+      `⚠️ *Registros:* ${occurrences.length} ocorrências cadastradas no plantão.\n` +
+      `📋 *Status:* ${occurrences.filter((o) => o.status === 'Resolvido').length} resolvidas, ${occurrences.filter((o) => o.status !== 'Resolvido').length} pendentes/em monitoramento.\n\n` +
+      `_A lista detalhada de ocorrências foi copiada para a área de transferência. Cole aqui na conversa:_`;
+
+    await shareOrFallback(
+      {
+        title,
+        text,
+        whatsappSummary,
+        fileName: 'ocorrencias-plantao-mairipora.txt',
+      },
+      (msg, isSuccess) => showToast(msg, isSuccess)
+    );
+  };
+
+  const handleDownloadTxt = () => {
+    const text = formatOccurrencesText();
+    downloadTextFile('livro-de-ocorrencias-mairipora.txt', text);
+    showToast('Arquivo de ocorrências baixado com sucesso!', true);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div
+          className={`p-3.5 rounded-xl border flex items-center justify-between text-xs shadow-lg animate-in fade-in slide-in-from-top-2 ${
+            toastMessage.isSuccess
+              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+              : 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-medium">{toastMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-[11px] font-bold text-slate-400 hover:text-white px-2 py-0.5"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
       {/* Header and Controls */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -95,13 +179,33 @@ export const OccurrenceLog: React.FC<OccurrenceLogProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setIsAdding(!isAdding)}
-          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          {isAdding ? 'Fechar Formulário' : 'Nova Ocorrência'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadTxt}
+            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Baixar lista de ocorrências em arquivo .txt"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-300" />
+            Baixar .txt
+          </button>
+
+          <button
+            onClick={handleShareOccurrences}
+            className="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
+            title="Compartilhar livro de ocorrências via WhatsApp ou Web Share"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Compartilhar / WhatsApp
+          </button>
+
+          <button
+            onClick={() => setIsAdding(!isAdding)}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            {isAdding ? 'Fechar Formulário' : 'Nova Ocorrência'}
+          </button>
+        </div>
       </div>
 
       {/* New Occurrence Modal/Drawer */}

@@ -13,18 +13,21 @@ export interface AuditoriumTeam {
   eventName: string;
   circuit: string;
   date: string;
-  dutyTechnician: string; // Plantonista
-  superintendentAV: string; // Superintendente Titular
-  assistantAudio: string;
-  assistantVideo: string;
-  assistantStage: string;
-  technicalDirector: string;
-  soundOperator: string;
-  soundAssistant: string; // Decibelímetro
-  switchOperator: string; // Mesa de Corte
-  mediaOperator: string; // JW Library
-  cameraOperators: string; // PTZ
-  stageMakeupTeam: string; // Palco & Maquiagem
+  dutyTechnician: string; // Plantonista Responsável
+  superintendentAudio: string; // Superintendente de Áudio (Principal / Obrigatório)
+  superintendentAV?: string; // Superintendente de A/V Titular
+  technicalDirector?: string; // Diretor Técnico
+  supervisionNotes?: string; // Observações de Supervisão e Equipe
+  // Campos opcionais mantidos para compatibilidade
+  assistantAudio?: string;
+  assistantVideo?: string;
+  assistantStage?: string;
+  soundOperator?: string;
+  soundAssistant?: string;
+  switchOperator?: string;
+  mediaOperator?: string;
+  cameraOperators?: string;
+  stageMakeupTeam?: string;
   notes?: string;
 }
 

@@ -9,6 +9,7 @@ import { OccurrenceLog } from './components/OccurrenceLog';
 import { ChecklistDrawer } from './components/ChecklistDrawer';
 import { ReportGenerator } from './components/ReportGenerator';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { EmergencyContainmentBar } from './components/EmergencyContainmentBar';
 import {
   Auditorium,
   AuditoriumTeam,
@@ -64,6 +65,8 @@ const INITIAL_OCCURRENCES: Occurrence[] = [
 export default function App() {
   const [currentAuditorium, setCurrentAuditorium] = useState<Auditorium>('A');
   const [activeTab, setActiveTab] = useState<string>('chat');
+  const [selectedTroubleshootId, setSelectedTroubleshootId] = useState<string>('no-sound-pc');
+  const [voiceTriggerCounter, setVoiceTriggerCounter] = useState<number>(0);
 
   // Teams state
   const [teamA, setTeamA] = useState<AuditoriumTeam>(() => {
@@ -151,12 +154,29 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-6">
+        {/* Plantão de Contenção & Suporte Imediato - Bloco de Acesso Rápido no Topo */}
+        <EmergencyContainmentBar
+          currentAuditorium={currentAuditorium}
+          onNavigateToTroubleshooting={(guideId) => {
+            setSelectedTroubleshootId(guideId);
+            setActiveTab('troubleshooting');
+          }}
+          onNavigateToVoiceChat={() => {
+            setActiveTab('chat');
+            setVoiceTriggerCounter((prev) => prev + 1);
+          }}
+          onNavigateToVisualizer={() => {
+            setActiveTab('visualizer');
+          }}
+        />
+
         {activeTab === 'chat' && (
           <div className="space-y-6">
             <AssistantChat
               currentAuditorium={currentAuditorium}
               onOpenTroubleshooting={() => setActiveTab('troubleshooting')}
+              autoStartVoiceTrigger={voiceTriggerCounter}
             />
             {/* Embedded Live SPL gauge for quick reference during chat */}
             <AudioVisualizer />
@@ -166,6 +186,8 @@ export default function App() {
         {activeTab === 'troubleshooting' && (
           <TroubleshootingGuide
             currentAuditorium={currentAuditorium}
+            selectedGuideId={selectedTroubleshootId}
+            onSelectGuideId={setSelectedTroubleshootId}
             onAddOccurrence={(occ) => {
               handleAddOccurrence(occ);
               setActiveTab('occurrences');

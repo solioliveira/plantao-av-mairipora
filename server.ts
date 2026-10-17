@@ -126,7 +126,7 @@ ${JSON.stringify(reportData, null, 2)}
 
 ESTRUTURA OBRIGATÓRIA:
 1. DADOS GERAIS (Data, Auditório A/B, Circuito/Evento, Plantonista responsável)
-2. ESCALA DAS EQUIPES COMPLETAS (Auditório A e Auditório B com todos os cargos: Superintendente Titular, Assistentes de Áudio, Vídeo e Palco, Diretor Técnico, Operador Qu-16, Assistente de Som/Decibelímetro, Operador de Corte Blackmagic, Operador de Mídia JW Library, Operadores de Câmera PTZ, Equipe de Palco & Maquiagem)
+2. LIDERANÇA E SUPERVISÃO DE ÁUDIO E VÍDEO (Auditório A e Auditório B: foco no Superintendente de Áudio como responsável principal de som, Superintendente de A/V Titular, Diretor Técnico, Plantonista do Salão e observações da equipe)
 3. CONDIÇÕES INICIAIS DOS EQUIPAMENTOS (Rack MA-61-E12-01, Nobreak APC 2200VA, Gerenciadores PM 1.3 PC 220V, TC Clarity M, Mesa Qu-16, Telões e Chave ATS)
 4. OCORRÊNCIAS E FALHAS REGISTRADAS (Horário, Categoria, Sintoma detalhado, Ação tomada pelo plantonista/equipe e Status final)
 5. OBSERVAÇÕES FINAIS E CHECKLIST DE ENCERRAMENTO (Status da sequência de desligamento: PCs -> Qu-16 Shutdown -> Câmeras User 1 -> Gerenciador 2 -> Gerenciador 1; Devolução dos 25 rádios FM de cada auditório; guarda de microfones no gaveteiro e recomendações para o próximo evento).
