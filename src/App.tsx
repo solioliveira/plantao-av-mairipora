@@ -253,6 +253,16 @@ export default function App() {
             teamB={teamB}
             occurrences={occurrences}
             checklist={checklist}
+            onRestoreBackup={(backupData) => {
+              if (backupData.teamA) setTeamA(backupData.teamA);
+              if (backupData.teamB) setTeamB(backupData.teamB);
+              if (backupData.occurrences && Array.isArray(backupData.occurrences)) {
+                setOccurrences(backupData.occurrences);
+              }
+              if (backupData.checklist && Array.isArray(backupData.checklist)) {
+                setChecklist(backupData.checklist);
+              }
+            }}
           />
         )}
       </main>

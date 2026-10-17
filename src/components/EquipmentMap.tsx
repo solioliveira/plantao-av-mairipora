@@ -13,6 +13,10 @@ import {
   Camera,
   Layers,
   Volume2,
+  Printer,
+  Copy,
+  Check,
+  Share2,
 } from 'lucide-react';
 import { QU16_CHANNELS, FM_CONFIG, PTZ_PRESETS, VIDEO_SWITCH_RULES } from '../data/constants';
 import { Auditorium } from '../types';
@@ -22,8 +26,9 @@ interface EquipmentMapProps {
 }
 
 export const EquipmentMap: React.FC<EquipmentMapProps> = ({ currentAuditorium }) => {
-  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'fm' | 'rack'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'fm' | 'rack' | 'cheatSheet'>('audio');
   const [selectedChannel, setSelectedChannel] = useState<string>('Ch 9/10');
+  const [copiedCheat, setCopiedCheat] = useState(false);
 
   const currentFm = currentAuditorium === 'A' ? FM_CONFIG.auditoriumA : FM_CONFIG.auditoriumB;
 
@@ -77,6 +82,18 @@ export const EquipmentMap: React.FC<EquipmentMapProps> = ({ currentAuditorium })
         >
           <Server className="w-4 h-4" />
           Rack & Segurança Elétrica
+        </button>
+
+        <button
+          onClick={() => setActiveTab('cheatSheet')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            activeTab === 'cheatSheet'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-amber-400 hover:text-amber-300 hover:bg-slate-800 border border-amber-500/30'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Guia de Bolso do Operador
         </button>
       </div>
 
@@ -516,6 +533,162 @@ export const EquipmentMap: React.FC<EquipmentMapProps> = ({ currentAuditorium })
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   1 Minuto de Autonomia
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: GUIA DE BOLSO DO OPERADOR (CHEAT SHEET) */}
+      {activeTab === 'cheatSheet' && (
+        <div className="space-y-6">
+          {/* Action Toolbar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-amber-400" />
+                Guia de Bolso / Cartão Rápido de Instruções ao Operador
+              </h3>
+              <p className="text-xs text-slate-400">
+                Ideal para enviar ao operador voluntário da semana via WhatsApp ou imprimir em 1 página.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const text = `📋 *GUIA DE BOLSO DO OPERADOR - SALÃO DE ASSEMBLEIAS DE MAIRIPORÃ (AUDITÓRIO ${currentAuditorium})*
+CO-160-T / rev. 2026
+
+🔴 *REGRAS DE OURO:*
+1. NUNCA mexa nas conexões, disjuntores ou cabos do Rack. Em qualquer dúvida, chame o Plantonista.
+2. Mesa Qu-16: Os faders estéreos sobem juntos automaticamente. NUNCA suba faders estéreos juntos com as duas mãos!
+
+🎛️ *MESA ALLEN & HEATH QU-16:*
+• Ch 1 a 7: Microfones (Ch 1 = Tribuna / Pedestal)
+• Ch 9/10: PC-1 (JW Library / Mídia Principal)
+• Ch 11/12: PC-2 (Reserva / JW Stream / Transmissão)
+• Ch 15: Master Auditório
+• Ch 16: Retorno do Palco
+• Medidor Clarity M: Referência em 0 dB (-6 a +6 dB tolerável, evitar ultrapassar -18 na circunferência).
+
+🎥 *VÍDEO (BLACKMAGIC & CONTROLADORA AW-RP50):*
+• Preset 1: Orador / Tribuna (cotovelo até topo da cabeça)
+• Preset 3: Entrevistas / Comentários no palco
+• Preset 10: Palco Aberto / Geral (trocas de participantes e ORAÇÕES)
+• Botão CUT: Corte seco para orador e entrevistados
+• Botão AUTO: Fusão suave para transição de vídeos e músicas
+
+📻 *RÁDIOS FM (AUDITÓRIO ${currentAuditorium}):*
+${currentAuditorium === 'A' ? '• 72.1 MHz: Deficientes Auditivos (Rádios 01 a 13)\n• 72.9 MHz: Audiodescrição (Rádios 14 a 25 - Tarja Laranja)' : '• 75.5 MHz: Deficientes Auditivos (Rádios 01 a 13)\n• 72.7 MHz: Audiodescrição (Rádios 14 a 25 - Tarja Laranja)'}
+
+⚡ *QUEDA DE ENERGIA / GERADOR:*
+• Aguarde 1 minuto: computadores e mesas permanecem no Nobreak APC 2200; telões e amplificadores religam automaticamente no gerador.`;
+
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text);
+                    setCopiedCheat(true);
+                    setTimeout(() => setCopiedCheat(false), 2500);
+                  }
+
+                  const encoded = encodeURIComponent(text);
+                  window.location.href = `https://api.whatsapp.com/send?text=${encoded}`;
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+              >
+                {copiedCheat ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                <span>{copiedCheat ? 'Copiado & Abrindo!' : 'Enviar no WhatsApp'}</span>
+              </button>
+
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-slate-400" />
+                <span>Imprimir Cartão</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Printable / Viewable Card */}
+          <div className="bg-slate-900 border-2 border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-6 print:border-none print:bg-white print:text-black">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between pb-4 border-b border-slate-800 gap-3">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  Manual Operacional Mairiporã • CO-160-T (rev. 2026)
+                </span>
+                <h2 className="text-lg font-black text-slate-100 mt-1">
+                  Cartão de Bolso do Operador • Auditório {currentAuditorium}
+                </h2>
+              </div>
+              <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30">
+                Uso em Bancada & Cabine
+              </span>
+            </div>
+
+            {/* Grid with 4 essential sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Box 1: Regras Críticas */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-rose-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>1. Regras Críticas de Segurança</span>
+                </div>
+                <ul className="space-y-1.5 text-slate-300">
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-rose-400 font-bold">•</span>
+                    <span><strong>NÃO MEXA NO RACK:</strong> Ninguém está autorizado a plugar gravadores, cabos ou alterar conexões no rack. Em falhas, acione o Plantonista.</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-rose-400 font-bold">•</span>
+                    <span><strong>FADERS ESTÉREOS QU-16:</strong> Sobem e descem sincronizados por motor. <em>NUNCA force os dois faders com as duas mãos!</em></span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Box 2: Roteamento Qu-16 & Medidor */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                  <Sliders className="w-4 h-4" />
+                  <span>2. Mesa Qu-16 & TC Clarity M</span>
+                </div>
+                <div className="space-y-1 text-slate-300">
+                  <p>• <strong>Ch 1-7:</strong> Microfones (Ch 1 = Tribuna/Pedestal)</p>
+                  <p>• <strong>Ch 9/10:</strong> Computador PC-1 (JW Library Principal)</p>
+                  <p>• <strong>Ch 11/12:</strong> Computador PC-2 (JW Stream / Backup)</p>
+                  <p>• <strong>Ch 15:</strong> Master Auditório | <strong>Ch 16:</strong> Retorno Palco</p>
+                  <p>• <strong>Clarity M:</strong> Referência <strong>0 dB</strong> (faixa -6 a +6 dB). Limite de segurança: não passar de -18 no anel externo.</p>
+                </div>
+              </div>
+
+              {/* Box 3: Vídeo & Câmeras PTZ */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-blue-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+                  <Camera className="w-4 h-4" />
+                  <span>3. Vídeo, Câmeras PTZ & Cortes</span>
+                </div>
+                <div className="space-y-1 text-slate-300">
+                  <p>• <strong>Preset 1 (AW-RP50):</strong> Orador / Tribuna (plano médio, cotovelo ao topo)</p>
+                  <p>• <strong>Preset 3:</strong> Entrevistas e comentários no palco</p>
+                  <p>• <strong>Preset 10:</strong> Palco Geral (trocas de partes e ORAÇÕES)</p>
+                  <p>• <strong>Botão CUT:</strong> Corte seco para fala e oradores</p>
+                  <p>• <strong>Botão AUTO:</strong> Fusão suave para vídeos e cânticos</p>
+                </div>
+              </div>
+
+              {/* Box 4: Rádios FM & Contingência */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <Radio className="w-4 h-4" />
+                  <span>4. Rádios FM & Queda de Rede</span>
+                </div>
+                <div className="space-y-1 text-slate-300">
+                  <p>• <strong>Auditório {currentAuditorium}:</strong> {currentAuditorium === 'A' ? '72.1 MHz (Auditivo) | 72.9 MHz (Audiodescrição)' : '75.5 MHz (Auditivo) | 72.7 MHz (Audiodescrição)'}</p>
+                  <p>• <strong>Rádios 01-13:</strong> Deficientes Auditivos</p>
+                  <p>• <strong>Rádios 14-25:</strong> Audiodescrição (tarja laranja)</p>
+                  <p>• <strong>Blackout:</strong> Transição para gerador dura 1 min. Mesas e PCs ficam no nobreak; telões religam sozinhos.</p>
+                </div>
               </div>
             </div>
           </div>

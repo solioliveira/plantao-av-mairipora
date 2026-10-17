@@ -36,7 +36,17 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
   const activeGuide = QUICK_TROUBLESHOOTING_GUIDES.find((g) => g.id === quickModalGuideId);
 
   const handleOpenQuickGuide = (guideId: string) => {
+    // 1. Open the 3-step immediate resolution pop-up card
     setQuickModalGuideId(guideId);
+    // 2. Automatically navigate to Troubleshooting tab with this exact guide focused
+    onNavigateToTroubleshooting(guideId);
+  };
+
+  const handleOpenVisualizerWithGuide = () => {
+    // 1. Open the 3-step immediate SPL resolution pop-up card
+    setQuickModalGuideId('spl-meter-guide');
+    // 2. Automatically navigate to the Decibelímetro tab
+    onNavigateToVisualizer();
   };
 
   return (
@@ -170,7 +180,7 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
 
         {/* 5. Decibelímetro SPL */}
         <button
-          onClick={onNavigateToVisualizer}
+          onClick={handleOpenVisualizerWithGuide}
           className="flex flex-col items-start justify-between p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-950/70 to-slate-900 border-2 border-emerald-500/50 hover:border-emerald-400 text-left transition-all active:scale-95 shadow-md group min-h-[96px]"
         >
           <div className="w-full flex items-center justify-between">
@@ -217,17 +227,28 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
 
       {/* Quick Mobile Modal for Instant On-The-Go Action (3 Immediate Steps) */}
       {activeGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border-2 border-emerald-500/60 p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={() => setQuickModalGuideId(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-2xl bg-slate-900 border-2 border-emerald-500/60 p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-start justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">
-                    Emergência Imediata
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">
+                      Roteiro Imediato
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      (Aba aberta no painel)
+                    </span>
+                  </div>
                   <h3 className="text-base font-bold text-white mt-0.5">
                     {activeGuide.title}
                   </h3>
@@ -236,6 +257,7 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
               <button
                 onClick={() => setQuickModalGuideId(null)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Fechar roteiro rápido"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -246,7 +268,7 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
               {/* Step 1 */}
               <div className="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/30 space-y-1">
                 <strong className="text-emerald-300 font-bold block flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   1. O que verificar primeiro (Posto de Operação):
                 </strong>
                 <p className="text-slate-200 whitespace-pre-line pl-5">
@@ -257,7 +279,7 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
               {/* Step 2 */}
               <div className="bg-slate-950 p-3.5 rounded-xl border border-amber-500/30 space-y-1">
                 <strong className="text-amber-300 font-bold block flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-amber-400" />
+                  <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
                   2. Onde ir fisicamente:
                 </strong>
                 <p className="text-slate-200 whitespace-pre-line pl-5">
@@ -268,7 +290,7 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
               {/* Step 3 */}
               <div className="bg-slate-950 p-3.5 rounded-xl border border-blue-500/30 space-y-1">
                 <strong className="text-blue-300 font-bold block flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                  <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
                   3. Ação corretiva segura (Regras do Rack):
                 </strong>
                 <p className="text-slate-200 whitespace-pre-line pl-5">
@@ -279,23 +301,16 @@ export const EmergencyContainmentBar: React.FC<EmergencyContainmentBarProps> = (
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
-              <button
-                onClick={() => {
-                  const id = activeGuide.id;
-                  setQuickModalGuideId(null);
-                  onNavigateToTroubleshooting(id);
-                }}
-                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold"
-              >
-                <span>Abrir no painel completo</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
+              <span className="text-[11px] text-slate-400">
+                Toque fora ou feche para interagir com os controles da aba.
+              </span>
 
               <button
                 onClick={() => setQuickModalGuideId(null)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md shrink-0 flex items-center gap-1.5"
               >
-                Concluir Consulta
+                <span>Fechar / Ir para Ferramenta</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>

@@ -305,4 +305,14 @@ export const QUICK_TROUBLESHOOTING_GUIDES = [
     step2: '2. Onde ir fisicamente:\n- No transmissor FM instalado no rack secundário ou bancada de apoio.',
     step3: '3. Ação corretiva segura:\n- Verificar se a saída Master L/R da Qu-16 está enviando sinal para o transmissor (cabo XLR/P10 firme).\n- Confirmar se o rádio entregue é da cor/tarja correta: Rádios 1 a 13 para deficientes auditivos; Rádios 14 a 25 com tarja laranja para audiodescrição.',
   },
+  {
+    id: 'spl-meter-guide',
+    title: 'Aferição de Níveis Acústicos & TC Clarity M',
+    category: 'Áudio',
+    urgency: 'Alta',
+    icon: 'Activity',
+    step1: '1. O que verificar primeiro (Posto de Operação):\n- No medidor TC Clarity M: conferir se o nível de operação está centrado em 0 dB FS (faixa aceitável de -6 a +6 dB).\n- REGRA DE OURO DO CLARITY: Evitar rigorosamente ultrapassar a marca de -18 na circunferência externa do visor.\n- No decibelímetro: voz de orador entre 70 e 77 dB SPL; cânticos e vídeos em 80 dB SPL.',
+    step2: '2. Onde ir fisicamente:\n- O Assistente de som circula discretamente no auditório com o smartphone/decibelímetro ativo para checar a pressão acústica real recebida pela assistência.',
+    step3: '3. Ação corretiva segura:\n- Ajustar suavemente o fader do Canal 1 (orador) ou Canais 9/10 (mídia) na mesa Qu-16 caso a pressão ultrapasse 77 dB para voz ou fique abaixo de 70 dB.\n- Faders estéreos sobem automaticamente na mesa; nunca suba com as duas mãos.',
+  },
 ];

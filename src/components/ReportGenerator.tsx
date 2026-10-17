@@ -11,6 +11,12 @@ import {
   AlertTriangle,
   Download,
   Send,
+  Upload,
+  Radio,
+  Zap,
+  Clock,
+  ShieldAlert,
+  MessageSquare,
 } from 'lucide-react';
 import { AuditoriumTeam, Occurrence, ChecklistItem, Auditorium } from '../types';
 import { shareOrFallback, downloadTextFile } from '../utils/shareUtils';
@@ -21,6 +27,12 @@ interface ReportGeneratorProps {
   teamB: AuditoriumTeam;
   occurrences: Occurrence[];
   checklist: ChecklistItem[];
+  onRestoreBackup?: (backupData: {
+    teamA?: AuditoriumTeam;
+    teamB?: AuditoriumTeam;
+    occurrences?: Occurrence[];
+    checklist?: ChecklistItem[];
+  }) => void;
 }
 
 export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
@@ -29,11 +41,14 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   teamB,
   occurrences,
   checklist,
+  onRestoreBackup,
 }) => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [customReportText, setCustomReportText] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; isSuccess: boolean } | null>(null);
+  const [showQuickNotices, setShowQuickNotices] = useState(false);
+  const [sentNoticeKey, setSentNoticeKey] = useState<string | null>(null);
 
   const showToast = (text: string, isSuccess: boolean) => {
     setToastMessage({ text, isSuccess });
@@ -192,6 +207,93 @@ Data: ${activeTeam.date}
     );
   };
 
+  const handleSendWhatsAppNotice = (key: string, text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    setSentNoticeKey(key);
+    setTimeout(() => setSentNoticeKey(null), 3000);
+    const encoded = encodeURIComponent(text);
+    window.location.href = `https://api.whatsapp.com/send?text=${encoded}`;
+  };
+
+  const handleExportJsonBackup = () => {
+    const backupData = {
+      version: '2026.1',
+      exportedAt: new Date().toISOString(),
+      currentAuditorium,
+      teamA,
+      teamB,
+      occurrences,
+      checklist,
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    downloadTextFile(`backup-plantao-mairipora-${activeTeam.date}.json`, jsonStr, 'application/json');
+    showToast('Backup do plantão (.json) baixado com sucesso!', true);
+  };
+
+  const handleImportJsonBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (onRestoreBackup) {
+          onRestoreBackup(parsed);
+          showToast('Dados do plantão restaurados com sucesso a partir do backup!', true);
+        }
+      } catch (err) {
+        showToast('Arquivo de backup inválido ou corrompido.', false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const QUICK_NOTICES = [
+    {
+      key: 'soundcheck',
+      title: 'Teste de Som e Vídeo (15 min antes)',
+      icon: Clock,
+      color: 'text-emerald-400',
+      text: `📢 *ALINHAMENTO A/V - SALÃO DE ASSEMBLEIAS DE MAIRIPORÃ (AUDITÓRIO ${currentAuditorium})*\n` +
+        `Data: ${activeTeam.date}\n\n` +
+        `Atenção equipe de Áudio e Vídeo: Iniciaremos o teste geral de microfones, JW Library (PCs 1 e 2) e câmeras em 15 minutos na cabine.\n` +
+        `Favor verificar postos, crachás e fones de ouvido.`,
+    },
+    {
+      key: 'fm-radios',
+      title: 'Distribuição dos 25 Rádios FM',
+      icon: Radio,
+      color: 'text-cyan-400',
+      text: `📻 *RÁDIOS FM LIBERADOS PARA O AUDITÓRIO ${currentAuditorium}*\n` +
+        `Frequências oficiais:\n` +
+        `${currentAuditorium === 'A' ? '• 72.1 MHz: Deficientes Auditivos (Rádios 01 a 13)\n• 72.9 MHz: Audiodescrição (Rádios 14 a 25 - Tarja Laranja)' : '• 75.5 MHz: Deficientes Auditivos (Rádios 01 a 13)\n• 72.7 MHz: Audiodescrição (Rádios 14 a 25 - Tarja Laranja)'}\n\n` +
+        `Todos os aparelhos estão testados e disponíveis no balcão de apoio.`,
+    },
+    {
+      key: 'power-generator',
+      title: 'Transição para Gerador / Queda',
+      icon: Zap,
+      color: 'text-amber-400',
+      text: `⚡ *ALERTA OPERACIONAL: TRANSIÇÃO PARA GERADOR*\n` +
+        `Houve oscilação na rede elétrica. Computadores e mesas de som/corte permanecem ativos no Nobreak APC 2200VA.\n` +
+        `A transição para o gerador leva 1 minuto. Telões e amplificadores religarão automaticamente. Manter calma na bancada.`,
+    },
+    {
+      key: 'closing-rack',
+      title: 'Alerta de Encerramento (Não mexer no Rack)',
+      icon: ShieldAlert,
+      color: 'text-rose-400',
+      text: `🛑 *ENCERRAMENTO DA SESSÃO - AVISO À EQUIPE*\n` +
+        `Lembramos à equipe: Ninguém está autorizado a mexer nas conexões, cabos ou disjuntores do Rack!\n` +
+        `O desligamento sequencial estrito dos gerenciadores de energia será realizado pelo Plantonista do Salão.\n` +
+        `Favor recolher os 25 rádios FM de cada auditório e desligar as chaves.`,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Toast Notification Banner */}
@@ -275,6 +377,29 @@ Data: ${activeTeam.date}
           </button>
 
           <button
+            onClick={handleExportJsonBackup}
+            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+            title="Salvar arquivo de backup com todas as ocorrências, checklists e escala (.json)"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-400" />
+            Backup .json
+          </button>
+
+          <label
+            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+            title="Restaurar dados de ocorrências e equipes a partir de arquivo de backup (.json)"
+          >
+            <Upload className="w-3.5 h-3.5 text-amber-400" />
+            Restaurar
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportJsonBackup}
+              className="hidden"
+            />
+          </label>
+
+          <button
             onClick={handleShare}
             className="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
             title="Compartilhar via aplicativo móvel ou copiar e abrir WhatsApp"
@@ -283,6 +408,64 @@ Data: ${activeTeam.date}
             Compartilhar / WhatsApp
           </button>
         </div>
+      </div>
+
+      {/* Quick WhatsApp Announcements for Volunteers */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-100">Avisos Rápidos no WhatsApp para a Equipe de Voluntários</h4>
+              <p className="text-[11px] text-slate-400">Toque para copiar o aviso oficial e disparar direto no grupo de áudio & vídeo</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowQuickNotices((prev) => !prev)}
+            className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
+          >
+            {showQuickNotices ? 'Ocultar Avisos' : 'Ver 4 Avisos Oficiais'}
+          </button>
+        </div>
+
+        {showQuickNotices && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 animate-in fade-in duration-200">
+            {QUICK_NOTICES.map((notice) => {
+              const Icon = notice.icon;
+              const isSent = sentNoticeKey === notice.key;
+
+              return (
+                <div
+                  key={notice.key}
+                  className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col justify-between space-y-2.5 hover:border-slate-700 transition-all"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-slate-200">
+                        <Icon className={`w-4 h-4 ${notice.color}`} />
+                        <span>{notice.title}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                      {notice.text.replace(/\*/g, '')}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleSendWhatsAppNotice(notice.key, notice.text)}
+                    className="w-full py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-emerald-600/90 text-slate-200 hover:text-white border border-slate-700 hover:border-emerald-500/50 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  >
+                    {isSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>{isSent ? 'Copiado & Abrindo WhatsApp...' : 'Enviar este Aviso no WhatsApp'}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Editor & Preview Area */}

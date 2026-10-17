@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Mic, Activity, AlertTriangle, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Volume2, VolumeX, Mic, Activity, AlertTriangle, CheckCircle, ShieldCheck, Calculator, Sparkles, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 
 interface AudioVisualizerProps {
   currentCategory?: 'voz' | 'musica';
@@ -12,6 +12,11 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
   const [isListening, setIsListening] = useState<boolean>(false);
   const [selectedTarget, setSelectedTarget] = useState<'voz' | 'musica'>(currentCategory);
   const [peakDb, setPeakDb] = useState<number>(75);
+  const [showCalculator, setShowCalculator] = useState<boolean>(false);
+  const [refSpl, setRefSpl] = useState<number>(75);
+  const [distFront, setDistFront] = useState<number>(8);
+  const [distBack, setDistBack] = useState<number>(32);
+  const [hasDelaySpeakers, setHasDelaySpeakers] = useState<boolean>(true);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -318,6 +323,181 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Expandable Acoustic Coverage Calculator & CO-160-T Reference */}
+      <div className="pt-1">
+        <button
+          onClick={() => setShowCalculator((prev) => !prev)}
+          className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800/90 border border-slate-800 text-slate-200 text-xs font-semibold transition-all cursor-pointer shadow-md"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Calculator className="w-4 h-4" />
+            </div>
+            <div className="text-left">
+              <div className="text-slate-100 font-bold">Calculadora Acústica de Cobertura & Padrões CO-160-T</div>
+              <div className="text-[11px] text-slate-400 font-normal">Estime a queda de SPL no fundo do auditório e confira os limites de conforto acústico</div>
+            </div>
+          </div>
+          {showCalculator ? (
+            <ChevronUp className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          )}
+        </button>
+
+        {showCalculator && (
+          <div className="mt-3 p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-6 shadow-xl animate-in fade-in duration-200">
+            {/* Interactive Calculator */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  Simulador de Pressão Sonora no Fundo do Auditório
+                </span>
+                <span className="text-[11px] text-slate-400">Lei do Inverso do Quadrado + Delay DBX</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Reference SPL */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <label className="text-slate-400 font-medium block">SPL na Tribuna / Frente:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={65}
+                      max={85}
+                      value={refSpl}
+                      onChange={(e) => setRefSpl(Number(e.target.value))}
+                      className="w-full accent-emerald-500"
+                    />
+                    <span className="font-bold text-emerald-400 text-sm w-12 text-right">{refSpl} dB</span>
+                  </div>
+                </div>
+
+                {/* Front Distance */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <label className="text-slate-400 font-medium block">Distância Frente / PA:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={4}
+                      max={15}
+                      value={distFront}
+                      onChange={(e) => setDistFront(Number(e.target.value))}
+                      className="w-full accent-emerald-500"
+                    />
+                    <span className="font-bold text-slate-200 text-sm w-12 text-right">{distFront} m</span>
+                  </div>
+                </div>
+
+                {/* Back Distance */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                  <label className="text-slate-400 font-medium block">Distância Fundo Auditório:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={15}
+                      max={50}
+                      value={distBack}
+                      onChange={(e) => setDistBack(Number(e.target.value))}
+                      className="w-full accent-emerald-500"
+                    />
+                    <span className="font-bold text-slate-200 text-sm w-12 text-right">{distBack} m</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delay Speakers Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                <div>
+                  <span className="text-slate-200 font-semibold block">Linha de Caixas de Delay Ativa (DBX Venu360)</span>
+                  <span className="text-slate-400 text-[11px]">Compensa atenuação natural nas últimas fileiras com atraso de milissegundos alinhado.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHasDelaySpeakers((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    hasDelaySpeakers
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {hasDelaySpeakers ? 'DELAY LIGADO' : 'SEM DELAY (CAMPO LIVRE)'}
+                </button>
+              </div>
+
+              {/* Calculation Result */}
+              {(() => {
+                const theoreticalDrop = 20 * Math.log10(Math.max(1, distBack) / Math.max(1, distFront));
+                const estimatedSpl = hasDelaySpeakers
+                  ? Math.round(refSpl - Math.min(3, theoreticalDrop * 0.25))
+                  : Math.round(refSpl - theoreticalDrop);
+                const isAcceptable = estimatedSpl >= 70 && estimatedSpl <= 77;
+
+                return (
+                  <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 font-medium">Nível Estimado Chegando ao Fundo:</span>
+                      <div className="flex items-baseline gap-2 mt-0.5">
+                        <span className={`text-2xl font-black ${isAcceptable ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {estimatedSpl} dB SPL
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          ({hasDelaySpeakers ? `Queda suave de ~${refSpl - estimatedSpl} dB com reforço de delay` : `Queda acústica de ~${Math.round(theoreticalDrop)} dB sem delay`})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                        isAcceptable
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      }`}>
+                        {isAcceptable ? '✓ Dentro da Faixa Alvo (70-77 dB)' : 'Atenção: Compensar na mesa Qu-16'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* CO-160-T Target Reference Table */}
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">
+                Tabela Oficial de Referência de Pressão Sonora (CO-160-T)
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Discursos / Fala</span>
+                  <div className="text-emerald-400 font-extrabold text-sm mt-0.5">70 a 77 dB SPL</div>
+                  <p className="text-[10px] text-slate-400 mt-1">Alvo ideal: 73 a 75 dB. Medir no centro do auditório.</p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Cânticos & Vídeos</span>
+                  <div className="text-cyan-400 font-extrabold text-sm mt-0.5">78 a 80 dB SPL</div>
+                  <p className="text-[10px] text-slate-400 mt-1">Máximo de 80 dB. Evitar que música abafe canto da congregação.</p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-semibold block uppercase">Mesa TC Clarity M</span>
+                  <div className="text-blue-400 font-extrabold text-sm mt-0.5">0 dB FS (Ref)</div>
+                  <p className="text-[10px] text-slate-400 mt-1">Faixa aceitável de -6 a +6 dB. Não ultrapassar -18 na circunferência.</p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-slate-950 border border-rose-500/30">
+                  <span className="text-[10px] text-rose-400 font-semibold block uppercase">Alerta de Fadiga</span>
+                  <div className="text-rose-400 font-extrabold text-sm mt-0.5">&gt; 82 dB SPL</div>
+                  <p className="text-[10px] text-slate-400 mt-1">Desconforto para idosos e crianças. Reduzir fader Master imediatamente.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
