@@ -1,5 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Mic, Activity, AlertTriangle, CheckCircle, ShieldCheck, Calculator, Sparkles, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  ShieldCheck,
+  Calculator,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Settings2,
+  Megaphone,
+  Radio,
+  RotateCcw,
+} from 'lucide-react';
 
 interface AudioVisualizerProps {
   currentCategory?: 'voz' | 'musica';
@@ -18,28 +36,177 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
   const [distBack, setDistBack] = useState<number>(32);
   const [hasDelaySpeakers, setHasDelaySpeakers] = useState<boolean>(true);
 
+  // Real Mic & Calibration state
+  const [micPermissionError, setMicPermissionError] = useState<string | null>(null);
+  const [calibrationOffset, setCalibrationOffset] = useState<number>(() => {
+    const saved = localStorage.getItem('spl_calibration_offset');
+    return saved ? Number(saved) : 98;
+  });
+  const [showCalibrationSettings, setShowCalibrationSettings] = useState<boolean>(false);
+  const [freqBars, setFreqBars] = useState<number[]>([12, 18, 25, 38, 50, 42, 28, 15]);
+
+  // Voice Alert (Text-to-Speech) state
+  const [voiceAlertEnabled, setVoiceAlertEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('spl_voice_alert_enabled') === 'true';
+  });
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const smoothDbRef = useRef<number>(73);
+  const lastAlertTimeRef = useRef<number>(0);
+  const aboveThresholdStartRef = useRef<number | null>(null);
 
   // Target ranges:
   // Voice: 70 - 77 dB
-  // Music: 80 dB
+  // Music: 78 - 80 dB (limit 80 dB)
   const targetMin = selectedTarget === 'voz' ? 70 : 78;
-  const targetMax = selectedTarget === 'voz' ? 77 : 82;
+  const targetMax = selectedTarget === 'voz' ? 77 : 80;
   const targetIdeal = selectedTarget === 'voz' ? 74 : 80;
 
-  // Real mic audio capture
+  // Persist settings
+  useEffect(() => {
+    localStorage.setItem('spl_calibration_offset', String(calibrationOffset));
+  }, [calibrationOffset]);
+
+  useEffect(() => {
+    localStorage.setItem('spl_voice_alert_enabled', String(voiceAlertEnabled));
+  }, [voiceAlertEnabled]);
+
+  // Cooldown countdown timer ticker
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = (now - lastAlertTimeRef.current) / 1000;
+      const cooldownTotal = 8; // 8 seconds
+      if (elapsed < cooldownTotal && lastAlertTimeRef.current > 0) {
+        setCooldownRemaining(Math.ceil(cooldownTotal - elapsed));
+      } else {
+        setCooldownRemaining(0);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Text-To-Speech alert engine
+  const speakVoiceAlert = useCallback(
+    (message: string) => {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'pt-BR';
+        utterance.rate = 1.05;
+        utterance.pitch = 1.0;
+
+        const voices = window.speechSynthesis.getVoices();
+        const ptVoice =
+          voices.find((v) => v.lang === 'pt-BR') ||
+          voices.find((v) => v.lang.startsWith('pt'));
+        if (ptVoice) {
+          utterance.voice = ptVoice;
+        }
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.speak(utterance);
+        lastAlertTimeRef.current = Date.now();
+      } catch (err) {
+        console.warn('Speech synthesis error:', err);
+        setIsSpeaking(false);
+      }
+    },
+    []
+  );
+
+  const testVoiceAlert = () => {
+    speakVoiceAlert(
+      `Alerta de voz ativo. Limite do auditório: ${targetMax} decibéis.`
+    );
+  };
+
+  // Evaluate sound level breach for voice alert
+  const checkVoiceAlertTrigger = useCallback(
+    (level: number) => {
+      if (!voiceAlertEnabled) {
+        aboveThresholdStartRef.current = null;
+        return;
+      }
+
+      const now = Date.now();
+      const timeSinceLastAlert = (now - lastAlertTimeRef.current) / 1000;
+      if (timeSinceLastAlert < 8) {
+        return; // In cooldown
+      }
+
+      const isBreached = level > targetMax;
+
+      if (isBreached) {
+        if (!aboveThresholdStartRef.current) {
+          aboveThresholdStartRef.current = now;
+        }
+
+        const breachDuration = now - aboveThresholdStartRef.current;
+        // Require 800ms sustained or critical >= 85 dB
+        if (breachDuration >= 800 || level >= 85) {
+          aboveThresholdStartRef.current = null;
+          let msg = '';
+          if (level >= 85) {
+            msg = `Alerta crítico! Som muito alto no auditório: ${level} decibéis! Reduzir Master!`;
+          } else if (selectedTarget === 'voz') {
+            msg = `Atenção: Nível de voz em ${level} decibéis, acima do limite de 77.`;
+          } else {
+            msg = `Atenção: Nível de música em ${level} decibéis, acima do limite de 80.`;
+          }
+          speakVoiceAlert(msg);
+        }
+      } else {
+        aboveThresholdStartRef.current = null;
+      }
+    },
+    [voiceAlertEnabled, targetMax, selectedTarget, speakVoiceAlert]
+  );
+
+  // Real mic audio capture with Web Audio API & AnalyserNode
   const startMicCapture = async () => {
+    setMicPermissionError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      // Best constraints to avoid phone AGC distorting real sound level
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+          video: false,
+        });
+      } catch {
+        // Fallback standard audio request
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false,
+        });
+      }
+
       streamRef.current = stream;
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtxConstructor =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioCtx = new AudioCtxConstructor();
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
       audioContextRef.current = audioCtx;
+
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.8;
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.6;
       analyserRef.current = analyser;
 
       const source = audioCtx.createMediaStreamSource(stream);
@@ -48,36 +215,63 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
       setIsListening(true);
       setMode('mic');
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const timeDomainData = new Float32Array(analyser.fftSize);
+      const freqDomainData = new Uint8Array(analyser.frequencyBinCount);
 
       const updateMeter = () => {
         if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(dataArray);
 
-        // Calculate RMS
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i] * dataArray[i];
+        // 1. Time-Domain true RMS for accurate physical SPL
+        analyserRef.current.getFloatTimeDomainData(timeDomainData);
+        let sumSquares = 0;
+        for (let i = 0; i < timeDomainData.length; i++) {
+          const val = timeDomainData[i];
+          sumSquares += val * val;
         }
-        const rms = Math.sqrt(sum / dataArray.length);
+        const rms = Math.sqrt(sumSquares / timeDomainData.length);
 
-        // Map to realistic SPL dB (roughly 45 to 88 dB scale)
-        const normalized = Math.min(100, Math.max(0, rms));
-        const estimatedDb = Math.round(50 + (normalized / 255) * 45);
+        // Calculate dBFS (0 dBFS is digital clipping, typical silence is -70 to -90 dBFS)
+        const dbFS = rms > 0.00003 ? 20 * Math.log10(rms) : -90;
 
-        setCurrentDb(estimatedDb);
-        setPeakDb((prev) => Math.max(prev, estimatedDb));
+        // Map to calibrated SPL dB
+        const rawSpl = calibrationOffset + dbFS;
+        const clampedSpl = Math.max(38, Math.min(105, rawSpl));
 
-        // Clarity M relative reading
-        const relativeClarity = Number(((estimatedDb - 74) / 4).toFixed(1));
+        // Fast exponential smoothing (approx. 125ms time constant)
+        smoothDbRef.current = smoothDbRef.current * 0.72 + clampedSpl * 0.28;
+        const currentCalculatedDb = Math.round(smoothDbRef.current);
+
+        setCurrentDb(currentCalculatedDb);
+        setPeakDb((prev) => Math.max(prev, currentCalculatedDb));
+
+        // Clarity M relative reading (-18 dB to +6 dB scale relative to reference)
+        const relativeClarity = Number(((currentCalculatedDb - 74) / 4).toFixed(1));
         setClarityDb(relativeClarity);
+
+        // 2. Frequency spectrum bars for live visual indicator
+        analyserRef.current.getByteFrequencyData(freqDomainData);
+        const step = Math.floor(freqDomainData.length / 8);
+        const bars: number[] = [];
+        for (let b = 0; b < 8; b++) {
+          const sample = freqDomainData[b * step] || 0;
+          bars.push(Math.round((sample / 255) * 100));
+        }
+        setFreqBars(bars);
+
+        // Check Text-To-Speech alert
+        checkVoiceAlertTrigger(currentCalculatedDb);
 
         animFrameRef.current = requestAnimationFrame(updateMeter);
       };
 
       updateMeter();
-    } catch (err) {
-      console.warn('Microphone permission not granted or unsupported, continuing in simulated mode.', err);
+    } catch (err: unknown) {
+      console.warn('Microphone permission or hardware error:', err);
+      const errorMsg =
+        err instanceof Error && err.name === 'NotAllowedError'
+          ? 'Permissão de microfone negada. Toque no ícone de permissão/cadeado do navegador e permita o microfone.'
+          : 'Não foi possível acessar o microfone deste dispositivo. Verifique as permissões de mídia.';
+      setMicPermissionError(errorMsg);
       setMode('simulated');
       setIsListening(false);
     }
@@ -87,17 +281,27 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
     }
     setIsListening(false);
     setMode('simulated');
   };
 
+  // Reset peak holder
+  const handleResetPeak = () => {
+    setPeakDb(currentDb);
+  };
+
   useEffect(() => {
     return () => {
       stopMicCapture();
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
@@ -123,7 +327,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
           </div>
           <div>
             <h3 className="font-bold text-sm sm:text-base text-slate-100 flex items-center gap-2">
-              Medição Acústica & TC Clarity M
+              Medição Acústica & Decibelímetro Real
               <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
                 CO-160-T
               </span>
@@ -134,34 +338,95 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
           </div>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex items-center gap-2 text-xs">
+        {/* Action Controls Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Real Mic Capture Button */}
           {mode === 'mic' && isListening ? (
             <button
               onClick={stopMicCapture}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition-all font-semibold shadow-sm cursor-pointer"
             >
-              <Mic className="w-3.5 h-3.5 animate-pulse" />
-              Microfone Ativo (Parar)
+              <Mic className="w-4 h-4 animate-pulse text-rose-400" />
+              <span>Microfone Ativo (Parar)</span>
             </button>
           ) : (
             <button
               onClick={startMicCapture}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors"
-              title="Permite que o assistente do operador use o celular como decibelímetro no auditório"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
+              title="Solicita permissão de áudio e mede o som real do auditório usando o microfone do celular ou tablet"
             >
-              <Mic className="w-3.5 h-3.5" />
-              Usar Microfone do Dispositivo
+              <Mic className="w-4 h-4" />
+              <span>Usar Microfone do Dispositivo</span>
             </button>
           )}
 
-          <div className="flex rounded-lg bg-slate-800/80 p-0.5 border border-slate-700">
+          {/* Voice Alert (TTS) Toggle Button */}
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={() => {
+                const nextVal = !voiceAlertEnabled;
+                setVoiceAlertEnabled(nextVal);
+                if (nextVal) {
+                  speakVoiceAlert(
+                    `Alerta por voz ativado. Alvo: até ${targetMax} decibéis.`
+                  );
+                }
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-semibold transition-all cursor-pointer ${
+                voiceAlertEnabled
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Ativa locução automática por voz (Text-to-Speech) caso o som ultrapasse o limite regulamentar"
+            >
+              {voiceAlertEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Voz de Alerta: Ligada</span>
+                  {isSpeaking && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  )}
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Voz de Alerta: Desligada</span>
+                </>
+              )}
+            </button>
+
+            {voiceAlertEnabled && (
+              <button
+                onClick={testVoiceAlert}
+                className="px-2 py-1.5 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
+                title="Tocar áudio de teste no alto-falante"
+              >
+                Testar Voz
+              </button>
+            )}
+          </div>
+
+          {/* Calibration button toggle */}
+          <button
+            onClick={() => setShowCalibrationSettings((prev) => !prev)}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              showCalibrationSettings
+                ? 'bg-slate-800 border-emerald-500/40 text-emerald-300'
+                : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Ajustar calibração do microfone do dispositivo (Offset SPL)"
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
+
+          {/* Target Mode (Voz vs Música) */}
+          <div className="flex rounded-lg bg-slate-950 p-0.5 border border-slate-800">
             <button
               onClick={() => {
                 setSelectedTarget('voz');
                 if (mode === 'simulated') setCurrentDb(74);
               }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 selectedTarget === 'voz'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -174,7 +439,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
                 setSelectedTarget('musica');
                 if (mode === 'simulated') setCurrentDb(80);
               }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                 selectedTarget === 'musica'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -186,6 +451,98 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
         </div>
       </div>
 
+      {/* Permission or Access Error Banner */}
+      {micPermissionError && (
+        <div className="mb-4 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{micPermissionError}</span>
+          </div>
+          <button
+            onClick={startMicCapture}
+            className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg text-xs cursor-pointer transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      )}
+
+      {/* Voice Alert Active Status Strip */}
+      {voiceAlertEnabled && (
+        <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <Megaphone className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Locução de Alerta Ativa:</strong> O sistema falará automaticamente em português se{' '}
+              {selectedTarget === 'voz' ? 'o discurso passar de 77 dB' : 'a música/vídeo passar de 80 dB'}.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isSpeaking ? (
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-bold text-[11px] animate-pulse">
+                <Volume2 className="w-3.5 h-3.5" />
+                Falando aviso...
+              </span>
+            ) : cooldownRemaining > 0 ? (
+              <span className="text-[11px] text-amber-400/80 font-mono">
+                Cooldown: {cooldownRemaining}s
+              </span>
+            ) : (
+              <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Pronto para monitorar
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Microphone Calibration Drawer */}
+      {showCalibrationSettings && (
+        <div className="mb-4 p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-3 animate-in fade-in">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span className="font-bold text-slate-200 flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-emerald-400" />
+              Ajuste Fino de Calibração do Microfone (Offset SPL)
+            </span>
+            <span className="text-[11px] text-slate-400">Padrão Celular/Tablet: 98 dB</span>
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Se você possuir um decibelímetro profissional de mão no auditório, ajuste o offset abaixo para equiparar
+            exatamente o valor medido no celular com o aparelho de referência.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCalibrationOffset((prev) => Math.max(80, prev - 1))}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-bold cursor-pointer"
+              >
+                -1 dB
+              </button>
+              <span className="font-mono font-bold text-emerald-400 text-sm px-2">
+                Offset: +{calibrationOffset} dB
+              </span>
+              <button
+                onClick={() => setCalibrationOffset((prev) => Math.min(115, prev + 1))}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-bold cursor-pointer"
+              >
+                +1 dB
+              </button>
+            </div>
+
+            <button
+              onClick={() => setCalibrationOffset(98)}
+              className="text-[11px] text-slate-400 hover:text-slate-200 underline cursor-pointer ml-auto"
+            >
+              Restaurar Padrão (98 dB)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Dual Meters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Decibelímetro Auditório */}
@@ -194,6 +551,12 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
             <div className="flex items-center gap-2">
               <Volume2 className="w-4 h-4 text-slate-400" />
               <span className="text-xs font-semibold text-slate-300">Decibelímetro (Auditório)</span>
+              {mode === 'mic' && (
+                <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  MIC REAL
+                </span>
+              )}
             </div>
             <span
               className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
@@ -217,8 +580,37 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
               {currentDb}
             </span>
             <span className="text-sm font-semibold text-slate-500">dB SPL</span>
-            <span className="text-xs text-slate-500 ml-2">Pico: {peakDb} dB</span>
+            <div className="flex items-center gap-1.5 ml-2">
+              <span className="text-xs text-slate-500">Pico: {peakDb} dB</span>
+              <button
+                onClick={handleResetPeak}
+                className="text-slate-500 hover:text-slate-300 p-0.5 transition-colors cursor-pointer"
+                title="Zerar valor de pico"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            </div>
           </div>
+
+          {/* Real Audio Spectrum Frequency Bars */}
+          {mode === 'mic' && isListening && (
+            <div className="mb-2">
+              <div className="flex items-end justify-between gap-1 h-8 px-2 py-1 bg-slate-900/80 rounded-lg border border-slate-800">
+                {freqBars.map((bar, idx) => (
+                  <div
+                    key={idx}
+                    className="flex-1 bg-gradient-to-t from-emerald-600 via-emerald-400 to-amber-400 rounded-sm transition-all duration-75"
+                    style={{ height: `${Math.max(10, bar)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1 px-1">
+                <span>Grave (100Hz)</span>
+                <span>Voz (1kHz)</span>
+                <span>Agudo (8kHz)</span>
+              </div>
+            </div>
+          )}
 
           {/* Bar Gauge */}
           <div className="space-y-1.5">
@@ -269,6 +661,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
                   setCurrentDb(val);
                   setPeakDb((prev) => Math.max(prev, val));
                   setClarityDb(Number(((val - 74) / 4).toFixed(1)));
+                  checkVoiceAlertTrigger(val);
                 }}
                 className="w-full accent-emerald-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
               />
