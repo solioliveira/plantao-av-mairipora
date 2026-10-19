@@ -10,6 +10,8 @@ import { ChecklistDrawer } from './components/ChecklistDrawer';
 import { ReportGenerator } from './components/ReportGenerator';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { EmergencyContainmentBar } from './components/EmergencyContainmentBar';
+import { PracticalShiftView } from './components/PracticalShiftView';
+import { PhysicalDispatchResolver } from './components/PhysicalDispatchResolver';
 import {
   Auditorium,
   AuditoriumTeam,
@@ -64,7 +66,7 @@ const INITIAL_OCCURRENCES: Occurrence[] = [
 
 export default function App() {
   const [currentAuditorium, setCurrentAuditorium] = useState<Auditorium>('A');
-  const [activeTab, setActiveTab] = useState<string>('chat');
+  const [activeTab, setActiveTab] = useState<string>('practical');
   const [selectedTroubleshootId, setSelectedTroubleshootId] = useState<string>('no-sound-pc');
   const [voiceTriggerCounter, setVoiceTriggerCounter] = useState<number>(0);
 
@@ -155,21 +157,57 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-6">
-        {/* Plantão de Contenção & Suporte Imediato - Bloco de Acesso Rápido no Topo */}
-        <EmergencyContainmentBar
-          currentAuditorium={currentAuditorium}
-          onNavigateToTroubleshooting={(guideId) => {
-            setSelectedTroubleshootId(guideId);
-            setActiveTab('troubleshooting');
-          }}
-          onNavigateToVoiceChat={() => {
-            setActiveTab('chat');
-            setVoiceTriggerCounter((prev) => prev + 1);
-          }}
-          onNavigateToVisualizer={() => {
-            setActiveTab('visualizer');
-          }}
-        />
+        {activeTab === 'practical' ? (
+          <PracticalShiftView
+            currentAuditorium={currentAuditorium}
+            onSelectAuditorium={setCurrentAuditorium}
+            teamA={teamA}
+            teamB={teamB}
+            onUpdateTeamA={setTeamA}
+            onUpdateTeamB={setTeamB}
+            occurrences={occurrences}
+            onAddOccurrence={handleAddOccurrence}
+            onDeleteOccurrence={handleDeleteOccurrence}
+            checklist={checklist}
+            onToggleChecklistItem={handleToggleChecklistItem}
+            onResetChecklist={() => {
+              handleResetChecklistPhase('abertura');
+              handleResetChecklistPhase('encerramento');
+            }}
+            onOpenAdvancedMode={() => setActiveTab('troubleshooting')}
+            onOpenDispatchMode={() => setActiveTab('dispatch')}
+          />
+        ) : (
+          <>
+            {/* Plantão de Contenção & Suporte Imediato - Bloco de Acesso Rápido no Topo */}
+            <EmergencyContainmentBar
+              currentAuditorium={currentAuditorium}
+              onNavigateToTroubleshooting={(guideId) => {
+                setSelectedTroubleshootId(guideId);
+                setActiveTab('troubleshooting');
+              }}
+              onNavigateToVoiceChat={() => {
+                setActiveTab('chat');
+                setVoiceTriggerCounter((prev) => prev + 1);
+              }}
+              onNavigateToVisualizer={() => {
+                setActiveTab('visualizer');
+              }}
+            />
+          </>
+        )}
+
+        {activeTab === 'dispatch' && (
+          <div className="space-y-6">
+            <PhysicalDispatchResolver
+              currentAuditorium={currentAuditorium}
+              onAddOccurrence={(occ) => {
+                handleAddOccurrence(occ);
+                setActiveTab('occurrences');
+              }}
+            />
+          </div>
+        )}
 
         {activeTab === 'chat' && (
           <div className="space-y-6">

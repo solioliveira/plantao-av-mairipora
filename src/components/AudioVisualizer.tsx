@@ -17,6 +17,10 @@ import {
   Megaphone,
   Radio,
   RotateCcw,
+  Play,
+  Square,
+  Waves,
+  Headphones,
 } from 'lucide-react';
 
 interface AudioVisualizerProps {
@@ -44,6 +48,14 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
   });
   const [showCalibrationSettings, setShowCalibrationSettings] = useState<boolean>(false);
   const [freqBars, setFreqBars] = useState<number[]>([12, 18, 25, 38, 50, 42, 28, 15]);
+
+  // Audio Test Tone Generator (1 kHz, Pink Noise, Stereo L/R check)
+  const [showTestToneGenerator, setShowTestToneGenerator] = useState<boolean>(false);
+  const [activeTestTone, setActiveTestTone] = useState<'none' | '1khz' | 'pink' | 'lr'>('none');
+  const [testToneVolume, setTestToneVolume] = useState<number>(0.25);
+  const testAudioCtxRef = useRef<AudioContext | null>(null);
+  const currentTestSourceRef = useRef<AudioNode | null>(null);
+  const testGainNodeRef = useRef<GainNode | null>(null);
 
   // Voice Alert (Text-to-Speech) state
   const [voiceAlertEnabled, setVoiceAlertEnabled] = useState<boolean>(() => {
@@ -291,6 +303,129 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
     setMode('simulated');
   };
 
+  // Test Tone Generator functions
+  const stopTestTone = useCallback(() => {
+    if (currentTestSourceRef.current) {
+      try {
+        (currentTestSourceRef.current as any).stop?.();
+        currentTestSourceRef.current.disconnect();
+      } catch {}
+      currentTestSourceRef.current = null;
+    }
+    if (testAudioCtxRef.current) {
+      try {
+        testAudioCtxRef.current.close().catch(() => {});
+      } catch {}
+      testAudioCtxRef.current = null;
+    }
+    setActiveTestTone('none');
+  }, []);
+
+  const play1kHzTone = async () => {
+    if (activeTestTone === '1khz') {
+      stopTestTone();
+      return;
+    }
+    stopTestTone();
+    try {
+      const AudioCtxConstructor =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtxConstructor();
+      if (ctx.state === 'suspended') await ctx.resume();
+      testAudioCtxRef.current = ctx;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, ctx.currentTime);
+      gain.gain.setValueAtTime(testToneVolume, ctx.currentTime);
+      testGainNodeRef.current = gain;
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      currentTestSourceRef.current = osc;
+      setActiveTestTone('1khz');
+    } catch (e) {
+      console.warn('Failed to start 1kHz test tone:', e);
+    }
+  };
+
+  const playPinkNoise = async () => {
+    if (activeTestTone === 'pink') {
+      stopTestTone();
+      return;
+    }
+    stopTestTone();
+    try {
+      const AudioCtxConstructor =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtxConstructor();
+      if (ctx.state === 'suspended') await ctx.resume();
+      testAudioCtxRef.current = ctx;
+
+      const bufferSize = ctx.sampleRate * 2;
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+        b6 = white * 0.115926;
+      }
+
+      const whiteNoise = ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(testToneVolume * 0.4, ctx.currentTime);
+      testGainNodeRef.current = gain;
+
+      whiteNoise.connect(gain);
+      gain.connect(ctx.destination);
+      whiteNoise.start();
+      currentTestSourceRef.current = whiteNoise;
+      setActiveTestTone('pink');
+    } catch (e) {
+      console.warn('Failed to start pink noise:', e);
+    }
+  };
+
+  const playStereoLRTest = async () => {
+    if (activeTestTone === 'lr') {
+      stopTestTone();
+      return;
+    }
+    stopTestTone();
+    setActiveTestTone('lr');
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const speakChannel = (text: string) => {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'pt-BR';
+        u.rate = 1.0;
+        window.speechSynthesis.speak(u);
+      };
+
+      speakChannel('Teste estéreo. Canal Esquerdo.');
+      setTimeout(() => {
+        speakChannel('Canal Direito.');
+      }, 3000);
+      setTimeout(() => {
+        speakChannel('Estéreo Central. Ambos os canais.');
+        setActiveTestTone('none');
+      }, 6000);
+    }
+  };
+
   // Reset peak holder
   const handleResetPeak = () => {
     setPeakDb(currentDb);
@@ -299,11 +434,12 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
   useEffect(() => {
     return () => {
       stopMicCapture();
+      stopTestTone();
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [stopTestTone]);
 
   // Determine status color
   const isWithinTarget = currentDb >= targetMin && currentDb <= targetMax;
@@ -406,6 +542,23 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
             )}
           </div>
 
+          {/* Audio Test Generator toggle */}
+          <button
+            onClick={() => setShowTestToneGenerator((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold transition-all cursor-pointer ${
+              showTestToneGenerator || activeTestTone !== 'none'
+                ? 'bg-purple-600/30 text-purple-300 border-purple-500/50 shadow-sm'
+                : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Gerador de Tons de Áudio para calibrar e testar Qu-16 e caixas de som"
+          >
+            <Waves className="w-3.5 h-3.5 text-purple-400" />
+            <span>Gerador de Teste</span>
+            {activeTestTone !== 'none' && (
+              <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+            )}
+          </button>
+
           {/* Calibration button toggle */}
           <button
             onClick={() => setShowCalibrationSettings((prev) => !prev)}
@@ -493,6 +646,121 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ currentCategor
                 <CheckCircle className="w-3 h-3" />
                 Pronto para monitorar
               </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Audio Test Tone Generator Drawer */}
+      {showTestToneGenerator && (
+        <div className="mb-4 p-4 rounded-xl bg-slate-950 border border-purple-500/40 text-xs space-y-4 animate-in fade-in">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+            <span className="font-bold text-slate-200 flex items-center gap-2">
+              <Waves className="w-4 h-4 text-purple-400" />
+              Gerador de Tons de Calibração &amp; Teste (Qu-16 e Caixas de Som)
+            </span>
+            <span className="text-[11px] text-purple-300 font-mono">Web Audio API • Sem pendrive</span>
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Conecte o fone ou adaptador do celular nas entradas <strong>ST1 ou ST2</strong> da mesa Qu-16
+            para testar ganho de entrada, aferir 0 dB no TC Clarity M ou conferir se as caixas de delay estão ligadas.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* 1. Tom 1 kHz */}
+            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2">
+              <div>
+                <strong className="text-slate-200 block text-xs">Tom Puro 1 kHz (Ref 0 dB)</strong>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Senóide contínua para ajustar ganho e calibrar o TC Clarity M em 0 dB.
+                </p>
+              </div>
+              <button
+                onClick={play1kHzTone}
+                className={`w-full py-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  activeTestTone === '1khz'
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : 'bg-purple-600 hover:bg-purple-500 text-white'
+                }`}
+              >
+                {activeTestTone === '1khz' ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{activeTestTone === '1khz' ? 'Parar Tom 1 kHz' : 'Tocar Tom 1 kHz'}</span>
+              </button>
+            </div>
+
+            {/* 2. Ruído Rosa (Pink Noise) */}
+            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2">
+              <div>
+                <strong className="text-slate-200 block text-xs">Ruído Rosa (Pink Noise)</strong>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Espectro balanceado para conferir se todas as caixas de delay do auditório estão funcionando.
+                </p>
+              </div>
+              <button
+                onClick={playPinkNoise}
+                className={`w-full py-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  activeTestTone === 'pink'
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : 'bg-purple-600 hover:bg-purple-500 text-white'
+                }`}
+              >
+                {activeTestTone === 'pink' ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{activeTestTone === 'pink' ? 'Parar Ruído Rosa' : 'Tocar Ruído Rosa'}</span>
+              </button>
+            </div>
+
+            {/* 3. Teste Estéreo L / R */}
+            <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-2">
+              <div>
+                <strong className="text-slate-200 block text-xs">Identificação Estéreo L / R</strong>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Voz alternada para certificar que os cabos estéreo do ST1/ST2 não estão invertidos ou mono.
+                </p>
+              </div>
+              <button
+                onClick={playStereoLRTest}
+                className={`w-full py-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  activeTestTone === 'lr'
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : 'bg-purple-600 hover:bg-purple-500 text-white'
+                }`}
+              >
+                {activeTestTone === 'lr' ? <Square className="w-3.5 h-3.5" /> : <Headphones className="w-3.5 h-3.5" />}
+                <span>{activeTestTone === 'lr' ? 'Executando Teste...' : 'Testar Canais L / R'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Volume Control */}
+          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+            <div className="flex items-center gap-2 w-64">
+              <span>Volume Gerador:</span>
+              <input
+                type="range"
+                min="0.05"
+                max="0.8"
+                step="0.05"
+                value={testToneVolume}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setTestToneVolume(val);
+                  if (testGainNodeRef.current && testAudioCtxRef.current) {
+                    testGainNodeRef.current.gain.setValueAtTime(val, testAudioCtxRef.current.currentTime);
+                  }
+                }}
+                className="w-full accent-purple-500 h-1.5 bg-slate-800 rounded cursor-pointer"
+              />
+              <span className="font-mono text-slate-300 font-bold">{Math.round(testToneVolume * 100)}%</span>
+            </div>
+
+            {activeTestTone !== 'none' && (
+              <button
+                onClick={stopTestTone}
+                className="text-rose-400 hover:text-rose-300 underline font-semibold cursor-pointer"
+              >
+                Parar Todos os Sons
+              </button>
             )}
           </div>
         </div>

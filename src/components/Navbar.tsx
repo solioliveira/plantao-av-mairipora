@@ -12,6 +12,9 @@ import {
   Users,
   FileText,
   CheckCircle2,
+  ShieldCheck,
+  MapPin,
+  Cable,
 } from 'lucide-react';
 import { Auditorium } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -107,13 +110,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <nav className="flex space-x-1 sm:space-x-2 overflow-x-auto no-scrollbar py-2">
           {[
-            { id: 'chat', label: 'Assistente IA de Plantão', icon: Bot, badge: 'IA' },
+            { id: 'practical', label: '📱 Plantão Prático (Dia a Dia)', icon: ShieldCheck, badge: 'Principal' },
+            { id: 'dispatch', label: '🧭 Onde Ir & O Que Fazer (Racks/Fibras)', icon: MapPin, badge: 'Despacho' },
             { id: 'troubleshooting', label: 'Troubleshooting Rápido', icon: AlertTriangle },
             { id: 'visualizer', label: 'Decibelímetro & Clarity M', icon: Activity },
-            { id: 'equipment', label: 'Mapa Técnico & Roteamento', icon: Sliders },
             { id: 'team', label: 'Escala de Equipes', icon: Users },
-            { id: 'occurrences', label: 'Livro de Ocorrências', icon: FileText, count: pendingOccurrencesCount },
             { id: 'checklist', label: 'Checklist Operacional', icon: CheckCircle2 },
+            { id: 'occurrences', label: 'Livro de Ocorrências', icon: FileText, count: pendingOccurrencesCount },
+            { id: 'equipment', label: 'Mapa Técnico & Roteamento', icon: Sliders },
+            { id: 'chat', label: 'Assistente IA', icon: Bot, badge: 'IA' },
             { id: 'report', label: 'Relatório Oficial', icon: Layers },
           ].map((item) => {
             const Icon = item.icon;
@@ -131,7 +136,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
                 <span>{item.label}</span>
                 {item.badge && (
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                  <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${
+                    item.id === 'practical'
+                      ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                      : 'bg-emerald-500/20 text-emerald-300'
+                  }`}>
                     {item.badge}
                   </span>
                 )}
